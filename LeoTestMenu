@@ -1,167 +1,103 @@
---// LeoHubUI Full Version with Effects, Animations, Toggle Button //
--- Made for loadstring execution
+-- LeoHubUI Havalı Sürüklenebilir Menü
+-- Aç/Kapa yok, sadece sürükleme var. Modern UI + efektler
 
--- Services
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "LeoHubUI"
+ScreenGui.Parent = game:GetService("CoreGui")
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+-- Ana Menü Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 380, 0, 280)
+MainFrame.Position = UDim2.new(0.5, -190, 0.5, -140)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
--- ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "LeoHubUI"
-screenGui.Parent = playerGui
-screenGui.ResetOnSpawn = false
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 14)
+UICorner.Parent = MainFrame
 
--- Toggle Button (Always Visible - Orta Sol)
-local toggleButton = Instance.new("TextButton")
-toggleButton.Name = "ToggleButton"
-toggleButton.Parent = screenGui
-toggleButton.Size = UDim2.new(0, 40, 0, 40)
-toggleButton.Position = UDim2.new(0, 5, 0.5, -20)
-toggleButton.AnchorPoint = Vector2.new(0, 0.5)
-toggleButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-toggleButton.Text = "≡"
-toggleButton.TextSize = 28
-toggleButton.TextColor3 = Color3.new(1,1,1)
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2.5
+UIStroke.Color = Color3.fromRGB(0, 200, 255)
+UIStroke.Transparency = 0.1
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+UIStroke.Parent = MainFrame
 
-local tbCorner = Instance.new("UICorner", toggleButton)
-tbCorner.CornerRadius = UDim.new(1,0)
+-- Gradient Arkaplan
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 10, 40)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255))
+}
+UIGradient.Rotation = 45
+UIGradient.Parent = MainFrame
 
-local tbStroke = Instance.new("UIStroke", toggleButton)
-tbStroke.Thickness = 2
-tbStroke.Color = Color3.fromRGB(0,255,170)
+-- Başlık
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -20, 0, 45)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "⚡ LeoHubUI ⚡"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 24
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextStrokeTransparency = 0.7
+Title.Parent = MainFrame
 
--- Main Frame (Menu)
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Parent = screenGui
-mainFrame.Size = UDim2.new(0, 400, 0, 300)
-mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-mainFrame.Visible = false
-
-local frameCorner = Instance.new("UICorner", mainFrame)
-frameCorner.CornerRadius = UDim.new(0,12)
-
-local frameStroke = Instance.new("UIStroke", mainFrame)
-frameStroke.Thickness = 3
-frameStroke.Color = Color3.fromRGB(0,255,170)
-
--- Title
-local title = Instance.new("TextLabel")
-title.Parent = mainFrame
-title.Size = UDim2.new(1,0,0,40)
-title.BackgroundTransparency = 1
-title.Text = "LeoHubUI"
-title.TextColor3 = Color3.fromRGB(0,255,170)
-title.TextSize = 26
-title.Font = Enum.Font.GothamBold
-
--- Close Button
-local closeBtn = Instance.new("TextButton")
-closeBtn.Parent = mainFrame
-closeBtn.Size = UDim2.new(0,40,0,40)
-closeBtn.Position = UDim2.new(1,-45,0,5)
-closeBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-closeBtn.Text = "X"
-closeBtn.TextColor3 = Color3.new(1,0,0)
-local cbCorner = Instance.new("UICorner", closeBtn)
-
--- Button Template Function
-local function createButton(name, yPos, callback)
+-- Buton oluşturma fonksiyonu
+local function createButton(name, order, callback)
     local btn = Instance.new("TextButton")
-    btn.Parent = mainFrame
-    btn.Size = UDim2.new(0.9,0,0,40)
-    btn.Position = UDim2.new(0.05,0,0,yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+    btn.Size = UDim2.new(1, -40, 0, 42)
+    btn.Position = UDim2.new(0, 20, 0, 55 + (order * 48))
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     btn.Text = name
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.TextSize = 20
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 18
+    btn.AutoButtonColor = true
+    btn.Parent = MainFrame
 
-    local bCorner = Instance.new("UICorner", btn)
-    local bStroke = Instance.new("UIStroke", btn)
-    bStroke.Color = Color3.fromRGB(0,255,170)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = btn
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 255, 200)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.2
+    stroke.Parent = btn
 
     btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60,60,60)}):Play()
+        btn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
     end)
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45,45,45)}):Play()
+        btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     end)
 
     btn.MouseButton1Click:Connect(callback)
 end
 
--- Example Hack Buttons
-local flyEnabled = false
-createButton("Fly", 60, function()
-    flyEnabled = not flyEnabled
-    local char = player.Character or player.CharacterAdded:Wait()
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if flyEnabled then
-        hum.PlatformStand = true
-        local bv = Instance.new("BodyVelocity", char.PrimaryPart)
-        bv.Velocity = Vector3.new(0,50,0)
-        bv.MaxForce = Vector3.new(1e5,1e5,1e5)
-    else
-        hum.PlatformStand = false
-        if char.PrimaryPart:FindFirstChild("BodyVelocity") then
-            char.PrimaryPart.BodyVelocity:Destroy()
-        end
-    end
+-- Butonlar
+createButton("🚀 Fly", 0, function()
+    print("Fly Activated!")
 end)
 
-createButton("Speed Boost", 110, function()
-    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-    if hum then hum.WalkSpeed = 100 end
+createButton("⚡ Speed Boost", 1, function()
+    print("Speed Activated!")
 end)
 
-createButton("Reset Speed", 160, function()
-    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-    if hum then hum.WalkSpeed = 16 end
+createButton("👤 Avatar Copy", 2, function()
+    print("Avatar Copy Triggered!")
 end)
 
-createButton("Rejoin", 210, function()
-    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+createButton("🔄 Rejoin", 3, function()
+    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, game.Players.LocalPlayer)
 end)
 
-createButton("Reset Character", 260, function()
-    player.Character:BreakJoints()
-end)
-
--- Toggle button functionality
-toggleButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
-end)
-
--- Close button functionality
-closeBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-end)
-
--- Dragging functionality
-local dragging, dragStart, startPos
-mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-    end
-end)
-
-mainFrame.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
+createButton("💀 Reset Character", 4, function()
+    game.Players.LocalPlayer.Character:BreakJoints()
 end)
