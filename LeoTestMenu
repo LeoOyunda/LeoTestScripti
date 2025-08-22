@@ -1,103 +1,172 @@
--- LeoHubUI Havalı Sürüklenebilir Menü
--- Aç/Kapa yok, sadece sürükleme var. Modern UI + efektler
+-- IceHub-style Menu with ON/OFF toggles (LocalScript)
+-- Place this LocalScript in StarterPlayerScripts or run via loadstring(game:HttpGet("RAW_URL"))()
+-- FEATURES: draggable UI, toggles for Speed, JumpPower, Fly, GodMode, Teleport to spawn, keybinds
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "LeoHubUI"
-ScreenGui.Parent = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
--- Ana Menü Frame
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 380, 0, 280)
-MainFrame.Position = UDim2.new(0.5, -190, 0.5, -140)
-MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 14)
-UICorner.Parent = MainFrame
-
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Thickness = 2.5
-UIStroke.Color = Color3.fromRGB(0, 200, 255)
-UIStroke.Transparency = 0.1
-UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-UIStroke.Parent = MainFrame
-
--- Gradient Arkaplan
-local UIGradient = Instance.new("UIGradient")
-UIGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 10, 40)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255))
+local config = {
+    Speed = 16,
+    JumpPower = 50,
+    FlySpeed = 50,
+    GodMode = false,
+    Fly = false,
+    SpeedEnabled = false,
+    JumpEnabled = false,
 }
-UIGradient.Rotation = 45
-UIGradient.Parent = MainFrame
 
--- Başlık
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -20, 0, 45)
-Title.Position = UDim2.new(0, 10, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "⚡ LeoHubUI ⚡"
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 24
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextStrokeTransparency = 0.7
-Title.Parent = MainFrame
+local function refreshCharacter()
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoid = character:WaitForChild("Humanoid")
+    if config.SpeedEnabled then humanoid.WalkSpeed = config.Speed end
+    if config.JumpEnabled then humanoid.JumpPower = config.JumpPower end
+    if config.GodMode then humanoid.MaxHealth, humanoid.Health = math.huge, math.huge end
+end
+player.CharacterAdded:Connect(refreshCharacter)
 
--- Buton oluşturma fonksiyonu
-local function createButton(name, order, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -40, 0, 42)
-    btn.Position = UDim2.new(0, 20, 0, 55 + (order * 48))
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 18
-    btn.AutoButtonColor = true
-    btn.Parent = MainFrame
+-- UI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "IceHubMenu"
+screenGui.ResetOnSpawn = false
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = btn
+local main = Instance.new("Frame", screenGui)
+main.Size = UDim2.new(0, 300, 0, 350)
+main.Position = UDim2.new(0.5, -150, 0.5, -175)
+main.BackgroundColor3 = Color3.fromRGB(30,30,40)
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(0, 255, 200)
-    stroke.Thickness = 1.5
-    stroke.Transparency = 0.2
-    stroke.Parent = btn
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
 
-    btn.MouseEnter:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+local title = Instance.new("TextLabel", main)
+title.Text = "IceHub - Toggle Menu"
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.BackgroundTransparency = 1
+
+local container = Instance.new("Frame", main)
+container.Size = UDim2.new(1, -20, 1, -50)
+container.Position = UDim2.new(0, 10, 0, 50)
+container.BackgroundTransparency = 1
+
+local layout = Instance.new("UIListLayout", container)
+layout.Padding = UDim.new(0, 10)
+
+local function makeToggle(name, callback)
+    local btn = Instance.new("TextButton", container)
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(45,45,55)
+    btn.Text = name .. ": OFF"
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 16
+    btn.TextColor3 = Color3.fromRGB(230,230,230)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+    local state = false
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = name .. ": " .. (state and "ON" or "OFF")
+        callback(state)
     end)
-    btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    end)
-
-    btn.MouseButton1Click:Connect(callback)
 end
 
--- Butonlar
-createButton("🚀 Fly", 0, function()
-    print("Fly Activated!")
+-- Toggles
+makeToggle("Speed", function(on)
+    config.SpeedEnabled = on
+    if on and humanoid then humanoid.WalkSpeed = config.Speed else humanoid.WalkSpeed = 16 end
 end)
 
-createButton("⚡ Speed Boost", 1, function()
-    print("Speed Activated!")
+makeToggle("Jump", function(on)
+    config.JumpEnabled = on
+    if on and humanoid then humanoid.JumpPower = config.JumpPower else humanoid.JumpPower = 50 end
 end)
 
-createButton("👤 Avatar Copy", 2, function()
-    print("Avatar Copy Triggered!")
+makeToggle("GodMode", function(on)
+    config.GodMode = on
+    if on and humanoid then humanoid.MaxHealth, humanoid.Health = math.huge, math.huge else humanoid.MaxHealth, humanoid.Health = 100, 100 end
 end)
 
-createButton("🔄 Rejoin", 3, function()
-    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, game.Players.LocalPlayer)
+-- Fly system
+local flyBV
+local flying = false
+local function startFly()
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    flyBV = Instance.new("BodyVelocity", character.HumanoidRootPart)
+    flyBV.MaxForce = Vector3.new(1e5,1e5,1e5)
+    flyBV.Velocity = Vector3.new()
+    flying = true
+    RunService.RenderStepped:Connect(function()
+        if flying and flyBV then
+            local cam = workspace.CurrentCamera
+            local move = Vector3.new()
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+            if move.Magnitude > 0 then move = move.Unit * config.FlySpeed end
+            flyBV.Velocity = move
+        end
+    end)
+end
+
+local function stopFly()
+    flying = false
+    if flyBV then flyBV:Destroy() flyBV = nil end
+    if humanoid then humanoid.WalkSpeed = config.Speed end
+end
+
+makeToggle("Fly", function(on)
+    config.Fly = on
+    if on then startFly() else stopFly() end
 end)
 
-createButton("💀 Reset Character", 4, function()
-    game.Players.LocalPlayer.Character:BreakJoints()
+-- Teleport
+makeToggle("Teleport Spawn", function(on)
+    if on and character and character:FindFirstChild("HumanoidRootPart") then
+        local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
+        if spawn then
+            character.HumanoidRootPart.CFrame = spawn.CFrame + Vector3.new(0,3,0)
+        else
+            character.HumanoidRootPart.CFrame = CFrame.new(0,10,0)
+        end
+    end
+end)
+
+-- Draggable
+local dragging, dragInput, dragStart, startPos
+main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+main.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Toggle UI with Insert key
+local visible = true
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.Insert then
+        visible = not visible
+        main.Visible = visible
+    end
 end)
