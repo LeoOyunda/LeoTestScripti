@@ -1,133 +1,605 @@
--- IceHub Style Menu (Toggle + Buttons)
-
-if game:GetService("CoreGui"):FindFirstChild("IceHubMenu") then
-    game:GetService("CoreGui").IceHubMenu:Destroy()
-end
+-- Leo IceHub - Advanced Neon Menu (LocalScript)
+-- Put this in StarterPlayerScripts OR host as raw on GitHub and loadstring it.
+-- Features: Neon UI, Toggles (Speed, Jump, God, Fly), Fly (WASD + Space/LCtrl), Avatar copy, Player list, Teleport, All On/Off
 
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
 
--- ScreenGui
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "IceHubMenu"
-ScreenGui.Parent = game:GetService("CoreGui")
+local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
 
--- Ana Frame
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 400, 0, 250)
-Frame.Position = UDim2.new(0.5, -200, 0.5, -125)
-Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Frame.Active = true
-Frame.Draggable = true
-Frame.Parent = ScreenGui
+-- ---------- Config / State ----------
+local state = {
+    speedEnabled = false,
+    speedVal = 50,
+    jumpEnabled = false,
+    jumpVal = 120,
+    godEnabled = false,
+    flyEnabled = false,
+    flySpeed = 80,
+    flyConnection = nil,
+    flyBV = nil,
+    flyBG = nil,
+    lastHumanoid = nil,
+}
 
--- Title
-local Title = Instance.new("TextLabel")
-Title.Text = "Leo IceHub Menu"
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 20
-Title.Parent = Frame
+-- Utility
+local function safeWaitCharacter()
+    local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+    return char
+end
 
--- UIListLayout
-local Layout = Instance.new("UIListLayout")
-Layout.Parent = Frame
-Layout.Padding = UDim.new(0, 5)
-Layout.FillDirection = Enum.FillDirection.Vertical
-Layout.SortOrder = Enum.SortOrder.LayoutOrder
+local function getHumanoid()
+    local char = localPlayer.Character
+    if not char then return nil end
+    return char:FindFirstChildOfClass("Humanoid")
+end
 
--- Buton Oluşturucu
-local function CreateToggle(name, callback)
-    local Button = Instance.new("TextButton")
-    Button.Text = name .. ": OFF"
-    Button.Size = UDim2.new(1, -10, 0, 40)
-    Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Button.Font = Enum.Font.SourceSansBold
-    Button.TextSize = 18
-    Button.Parent = Frame
-
-    local toggled = false
-    Button.MouseButton1Click:Connect(function()
-        toggled = not toggled
-        if toggled then
-            Button.Text = name .. ": ON"
-            Button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        else
-            Button.Text = name .. ": OFF"
-            Button.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-        end
-        callback(toggled)
+local function notify(title, text, duration)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title or "LeoHub",
+            Text = text or "",
+            Duration = duration or 2
+        })
     end)
 end
 
--- 🔹 Speed Hack
-CreateToggle("Speed", function(state)
-    if state then
-        LocalPlayer.Character.Humanoid.WalkSpeed = 50
+-- Reapply settings on respawn
+local function applySettingsToHumanoid(hum)
+    if not hum then return end
+    if state.speedEnabled then hum.WalkSpeed = state.speedVal else hum.WalkSpeed = 16 end
+    if state.jumpEnabled then hum.JumpPower = state.jumpVal else hum.JumpPower = 50 end
+    if state.godEnabled then
+        hum.MaxHealth = math.huge
+        hum.Health = hum.MaxHealth
+        -- Hook health changed
+        hum.HealthChanged:Connect(function()
+            if hum and hum.Health < hum.MaxHealth then
+                hum.Health = hum.MaxHealth
+            end
+        end)
     else
-        LocalPlayer.Character.Humanoid.WalkSpeed = 16
+        hum.MaxHealth = 100
+        if hum.Health > 100 then hum.Health = 100 end
     end
-end)
+end
 
--- 🔹 Jump Hack
-CreateToggle("Jump", function(state)
-    if state then
-        LocalPlayer.Character.Humanoid.JumpPower = 120
-    else
-        LocalPlayer.Character.Humanoid.JumpPower = 50
-    end
-end)
+local function onCharacterAdded(char)
+    task.wait(0.1)
+    local hum = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid")
+    state.lastHumanoid = hum
+    applySettingsToHumanoid(hum)
+end
+if localPlayer.Character then
+    onCharacterAdded(localPlayer.Character)
+end
+localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
--- 🔹 Fly (basit toggle)
-local flyConnection
-CreateToggle("Fly", function(state)
-    local char = LocalPlayer.Character
-    if state and char then
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            StarterGui:SetCore("SendNotification", {Title="IceHub", Text="Fly ON", Duration=2})
-            flyConnection = game:GetService("RunService").RenderStepped:Connect(function()
-                char:TranslateBy(Vector3.new(0,0.5,0))
+-- ---------- Fly Implementation ----------
+local flyLoopConn = nil
+local function startFly()
+    if state.flyEnabled then return end
+    local char = safeWaitCharacter()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then notify("Fly", "No HumanoidRootPart", 2); return end
+
+    -- Create BodyVelocity & BodyGyro
+    state.flyBV = Instance.new("BodyVelocity")
+    state.flyBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    state.flyBV.Velocity = Vector3.new(0,0,0)
+    state.flyBV.Parent = hrp
+
+    state.flyBG = Instance.new("BodyGyro")
+    state.flyBG.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    state.flyBG.P = 2000
+    state.flyBG.CFrame = hrp.CFrame
+    state.flyBG.Parent = hrp
+
+    state.flyEnabled = true
+    notify("Fly", "Fly Enabled", 2)
+
+    flyLoopConn = RunService.RenderStepped:Connect(function()
+        if not state.flyEnabled or not hrp then return end
+        local cam = workspace.CurrentCamera
+        local moveVector = Vector3.new(0,0,0)
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector = moveVector + cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector = moveVector - cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector = moveVector - cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector = moveVector + cam.CFrame.RightVector end
+        local up = 0
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then up = up + 1 end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then up = up - 1 end
+
+        local direction = Vector3.new(moveVector.X, up, moveVector.Z)
+        if direction.Magnitude > 0 then
+            direction = direction.Unit * state.flySpeed
+        end
+
+        -- preserve vertical momentum if no keys pressed slightly (so player doesn't jitter)
+        state.flyBV.Velocity = Vector3.new(direction.X, direction.Y, direction.Z)
+        -- face camera direction
+        state.flyBG.CFrame = CFrame.new(hrp.Position, hrp.Position + Vector3.new(cam.CFrame.LookVector.X, 0, cam.CFrame.LookVector.Z))
+    end)
+end
+
+local function stopFly()
+    state.flyEnabled = false
+    if flyLoopConn then flyLoopConn:Disconnect(); flyLoopConn = nil end
+    if state.flyBV then pcall(function() state.flyBV:Destroy() end); state.flyBV = nil end
+    if state.flyBG then pcall(function() state.flyBG:Destroy() end); state.flyBG = nil end
+    -- restore walkspeed
+    local hum = getHumanoid()
+    if hum then hum.WalkSpeed = (state.speedEnabled and state.speedVal) or 16 end
+    notify("Fly", "Fly Disabled", 2)
+end
+
+-- ---------- Avatar Copy ----------
+local function populatePlayersScrolling(frame)
+    frame:ClearAllChildren()
+    local layout = Instance.new("UIListLayout", frame)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0,6)
+
+    for i, p in ipairs(Players:GetPlayers()) do
+        if p ~= localPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 32)
+            btn.BackgroundColor3 = Color3.fromRGB(20,20,30)
+            btn.TextColor3 = Color3.fromRGB(230,230,255)
+            btn.Text = p.Name
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 14
+            btn.Parent = frame
+
+            btn.MouseButton1Click:Connect(function()
+                -- highlight selection
+                for _,c in pairs(frame:GetChildren()) do
+                    if c:IsA("TextButton") then c.BackgroundColor3 = Color3.fromRGB(20,20,30) end
+                end
+                btn.BackgroundColor3 = Color3.fromRGB(60,20,120)
+                frame.selected = p
             end)
         end
-    else
-        if flyConnection then
-            flyConnection:Disconnect()
-            StarterGui:SetCore("SendNotification", {Title="IceHub", Text="Fly OFF", Duration=2})
+    end
+end
+
+local function copyAvatarFromPlayer(targetPlayer)
+    if not targetPlayer then notify("Avatar Copy","No player selected",2); return end
+    local ok, desc = pcall(function()
+        return Players:GetHumanoidDescriptionFromUserId(targetPlayer.UserId)
+    end)
+    if not ok or not desc then notify("Avatar Copy","Could not get description",2); return end
+    -- apply to localPlayer
+    local char = safeWaitCharacter()
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        pcall(function() hum:ApplyDescription(desc) end)
+        notify("Avatar Copy", "Copied from "..targetPlayer.Name, 2)
+    end
+end
+
+-- ---------- UI Construction (Neon look) ----------
+local function makeNeonGui()
+    -- base ScreenGui in PlayerGui
+    if playerGui:FindFirstChild("LeoIceHub_UI") then playerGui.LeoIceHub_UI:Destroy() end
+    local screenGui = Instance.new("ScreenGui", playerGui)
+    screenGui.Name = "LeoIceHub_UI"
+    screenGui.ResetOnSpawn = false
+
+    local main = Instance.new("Frame", screenGui)
+    main.Name = "Main"
+    main.Size = UDim2.new(0, 420, 0, 520)
+    main.Position = UDim2.new(0.5, -210, 0.5, -260)
+    main.AnchorPoint = Vector2.new(0.5,0.5)
+    main.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+    main.BorderSizePixel = 0
+
+    local corner = Instance.new("UICorner", main)
+    corner.CornerRadius = UDim.new(0, 14)
+
+    -- Neon edge
+    local edge = Instance.new("UIStroke", main)
+    edge.Thickness = 2
+    edge.Color = Color3.fromRGB(75, 160, 255)
+    edge.Transparency = 0.35
+
+    local title = Instance.new("TextLabel", main)
+    title.Size = UDim2.new(1, 0, 0, 48)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 0.15
+    title.BackgroundColor3 = Color3.fromRGB(18,18,28)
+    title.Text = "Leo IceHub • Neon"
+    title.TextColor3 = Color3.fromRGB(235, 245, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 20
+
+    local titleStroke = Instance.new("UIStroke", title)
+    titleStroke.Color = Color3.fromRGB(150,200,255)
+    titleStroke.Thickness = 1
+
+    -- Close / Hide
+    local closeBtn = Instance.new("TextButton", main)
+    closeBtn.Size = UDim2.new(0, 36, 0, 28)
+    closeBtn.Position = UDim2.new(1, -42, 0, 10)
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.Gotham
+    closeBtn.TextSize = 16
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200,70,70)
+    closeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    closeBtn.AutoButtonColor = true
+    closeBtn:GetPropertyChangedSignal("BackgroundColor3"):Connect(function() end)
+
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui.Enabled = false
+    end)
+
+    -- Left column (controls)
+    local left = Instance.new("Frame", main)
+    left.Size = UDim2.new(0.58, -12, 1, -64)
+    left.Position = UDim2.new(0, 8, 0, 56)
+    left.BackgroundTransparency = 1
+
+    local leftLayout = Instance.new("UIListLayout", left)
+    leftLayout.Padding = UDim.new(0,8)
+    leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    leftLayout.FillDirection = Enum.FillDirection.Vertical
+
+    local function makeSectionLabel(text)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, 0, 0, 22)
+        lbl.BackgroundTransparency = 1
+        lbl.Font = Enum.Font.GothamSemibold
+        lbl.TextSize = 13
+        lbl.TextColor3 = Color3.fromRGB(160, 200, 255)
+        lbl.Text = text
+        return lbl
+    end
+
+    local function makeToggleBtn(name, initial, onToggle)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 38)
+        btn.BackgroundColor3 = Color3.fromRGB(20,20,30)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 16
+        btn.TextColor3 = Color3.fromRGB(220,220,255)
+        btn.Text = name .. " • OFF"
+        btn.AutoButtonColor = true
+        local stroke = Instance.new("UIStroke", btn)
+        stroke.Color = Color3.fromRGB(80,160,255)
+        stroke.Transparency = 0.6
+        local corner = Instance.new("UICorner", btn)
+        corner.CornerRadius = UDim.new(0,8)
+
+        local toggled = initial
+        local function update()
+            btn.Text = name .. (toggled and " • ON" or " • OFF")
+            btn.BackgroundColor3 = toggled and Color3.fromRGB(10,50,30) or Color3.fromRGB(20,20,30)
+        end
+        update()
+
+        btn.MouseButton1Click:Connect(function()
+            toggled = not toggled
+            update()
+            pcall(onToggle, toggled)
+        end)
+        return btn
+    end
+
+    -- Speed
+    left:WaitForChild("UIListLayout")
+    table.insert = table.insert -- (silence lint)
+    left.Parent = main
+    leftLayout.Parent = left
+
+    leftLayout.Padding = UDim.new(0,8)
+
+    left:WaitForChild("UIListLayout")
+
+    left:ClearAllChildren()
+    local lbl1 = makeSectionLabel("Player Mods")
+    lbl1.Parent = left
+
+    local speedBtn = makeToggleBtn("Speed", state.speedEnabled, function(on)
+        state.speedEnabled = on
+        local hum = getHumanoid()
+        if hum then hum.WalkSpeed = on and state.speedVal or 16 end
+    end)
+    speedBtn.Parent = left
+
+    -- Speed slider row
+    local speedRow = Instance.new("Frame", left)
+    speedRow.Size = UDim2.new(1,0,0,36)
+    speedRow.BackgroundTransparency = 1
+    local sLbl = Instance.new("TextLabel", speedRow)
+    sLbl.Size = UDim2.new(0.5,0,1,0)
+    sLbl.BackgroundTransparency = 1
+    sLbl.Text = "Speed: "..tostring(state.speedVal)
+    sLbl.Font = Enum.Font.Gotham
+    sLbl.TextSize = 14
+    sLbl.TextColor3 = Color3.fromRGB(200,200,255)
+    sLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local sBarBg = Instance.new("Frame", speedRow)
+    sBarBg.Size = UDim2.new(0.5,-6,0,12)
+    sBarBg.Position = UDim2.new(0.5,6,0,12)
+    sBarBg.BackgroundColor3 = Color3.fromRGB(12,12,20)
+    sBarBg.AnchorPoint = Vector2.new(0,0)
+    sBarBg.LayoutOrder = 2
+    local sBarCorner = Instance.new("UICorner", sBarBg)
+    sBarCorner.CornerRadius = UDim.new(0,6)
+    local sBar = Instance.new("Frame", sBarBg)
+    sBar.Size = UDim2.new((state.speedVal-16)/(200-16),0,1,0)
+    local sBarCorner2 = Instance.new("UICorner", sBar)
+
+    local dragging = false
+    sBarBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+    end)
+    sBarBg.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+        local absX = input.Position.X
+        local rel = math.clamp((absX - sBarBg.AbsolutePosition.X) / sBarBg.AbsoluteSize.X, 0, 1)
+        sBar.Size = UDim2.new(rel,0,1,0)
+        local val = math.floor(16 + (200-16) * rel + 0.5)
+        state.speedVal = val
+        sLbl.Text = "Speed: "..tostring(val)
+        local hum = getHumanoid()
+        if hum and state.speedEnabled and not state.flyEnabled then hum.WalkSpeed = val end
+    end)
+
+    -- Jump
+    local jumpBtn = makeToggleBtn("Jump", state.jumpEnabled, function(on)
+        state.jumpEnabled = on
+        local hum = getHumanoid()
+        if hum then hum.JumpPower = on and state.jumpVal or 50 end
+    end)
+    jumpBtn.Parent = left
+
+    -- Jump slider
+    local jumpRow = Instance.new("Frame", left)
+    jumpRow.Size = UDim2.new(1,0,0,36)
+    jumpRow.BackgroundTransparency = 1
+    local jLbl = Instance.new("TextLabel", jumpRow)
+    jLbl.Size = UDim2.new(0.5,0,1,0)
+    jLbl.BackgroundTransparency = 1
+    jLbl.Text = "Jump: "..tostring(state.jumpVal)
+    jLbl.Font = Enum.Font.Gotham
+    jLbl.TextSize = 14
+    jLbl.TextColor3 = Color3.fromRGB(200,200,255)
+    jLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local jBarBg = Instance.new("Frame", jumpRow)
+    jBarBg.Size = UDim2.new(0.5,-6,0,12)
+    jBarBg.Position = UDim2.new(0.5,6,0,12)
+    jBarBg.BackgroundColor3 = Color3.fromRGB(12,12,20)
+    local jBar = Instance.new("Frame", jBarBg)
+    jBar.Size = UDim2.new((state.jumpVal-50)/(300-50),0,1,0)
+    local jBarCorner = Instance.new("UICorner", jBarBg)
+    local jBarCorner2 = Instance.new("UICorner", jBar)
+
+    local draggingJ = false
+    jBarBg.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingJ = true end end)
+    jBarBg.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingJ = false end end)
+    UserInputService.InputChanged:Connect(function(input)
+        if not draggingJ then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+        local absX = input.Position.X
+        local rel = math.clamp((absX - jBarBg.AbsolutePosition.X) / jBarBg.AbsoluteSize.X, 0, 1)
+        jBar.Size = UDim2.new(rel,0,1,0)
+        local val = math.floor(50 + (300-50) * rel + 0.5)
+        state.jumpVal = val
+        jLbl.Text = "Jump: "..tostring(val)
+        local hum = getHumanoid()
+        if hum and state.jumpEnabled then hum.JumpPower = val end
+    end)
+
+    -- Fly toggle
+    local flyBtn = makeToggleBtn("Fly", false, function(on)
+        if on then startFly() else stopFly() end
+    end)
+    flyBtn.Parent = left
+
+    -- GodMode
+    local godBtn = makeToggleBtn("GodMode", false, function(on)
+        state.godEnabled = on
+        local hum = getHumanoid()
+        if hum then
+            if on then
+                hum.MaxHealth = math.huge
+                hum.Health = hum.MaxHealth
+            else
+                hum.MaxHealth = 100
+                if hum.Health > 100 then hum.Health = 100 end
+            end
+        end
+    end)
+    godBtn.Parent = left
+
+    -- All On/Off
+    local allRow = Instance.new("Frame", left)
+    allRow.Size = UDim2.new(1,0,0,40)
+    allRow.BackgroundTransparency = 1
+    local allOn = Instance.new("TextButton", allRow)
+    allOn.Size = UDim2.new(0.5,-6,1,0)
+    allOn.Position = UDim2.new(0,0,0,0)
+    allOn.Text = "All ON"
+    allOn.Font = Enum.Font.GothamBold
+    allOn.TextSize = 14
+    allOn.BackgroundColor3 = Color3.fromRGB(30,100,30)
+    local allOff = Instance.new("TextButton", allRow)
+    allOff.Size = UDim2.new(0.5,-6,1,0)
+    allOff.Position = UDim2.new(0.5,6,0,0)
+    allOff.Text = "All OFF"
+    allOff.Font = Enum.Font.GothamBold
+    allOff.TextSize = 14
+    allOff.BackgroundColor3 = Color3.fromRGB(100,30,30)
+
+    allOn.MouseButton1Click:Connect(function()
+        -- enable all (not avatar)
+        state.speedEnabled = true; state.jumpEnabled = true; state.godEnabled = true
+        local hum = getHumanoid()
+        if hum then hum.WalkSpeed = state.speedVal; hum.JumpPower = state.jumpVal; hum.MaxHealth = math.huge; hum.Health = hum.MaxHealth end
+        notify("All", "All mods enabled", 2)
+        -- update button visuals (crude)
+        speedBtn.BackgroundColor3 = Color3.fromRGB(10,50,30); speedBtn.Text = "Speed • ON"
+        jumpBtn.BackgroundColor3 = Color3.fromRGB(10,50,30); jumpBtn.Text = "Jump • ON"
+        godBtn.BackgroundColor3 = Color3.fromRGB(10,50,30); godBtn.Text = "GodMode • ON"
+    end)
+    allOff.MouseButton1Click:Connect(function()
+        state.speedEnabled = false; state.jumpEnabled = false; state.godEnabled = false
+        local hum = getHumanoid()
+        if hum then hum.WalkSpeed = 16; hum.JumpPower = 50; hum.MaxHealth = 100; if hum.Health>100 then hum.Health=100 end end
+        notify("All", "All mods disabled", 2)
+        speedBtn.BackgroundColor3 = Color3.fromRGB(20,20,30); speedBtn.Text = "Speed • OFF"
+        jumpBtn.BackgroundColor3 = Color3.fromRGB(20,20,30); jumpBtn.Text = "Jump • OFF"
+        godBtn.BackgroundColor3 = Color3.fromRGB(20,20,30); godBtn.Text = "GodMode • OFF"
+        stopFly()
+    end)
+
+    -- Right column (avatar + list)
+    local right = Instance.new("Frame", main)
+    right.Size = UDim2.new(0.38, -12, 1, -64)
+    right.Position = UDim2.new(0.62, 4, 0, 56)
+    right.BackgroundTransparency = 1
+
+    local rLabel = makeSectionLabel("Avatar Copy")
+    rLabel.Parent = right
+
+    local playersScroll = Instance.new("ScrollingFrame", right)
+    playersScroll.Size = UDim2.new(1, 0, 0.75, 0)
+    playersScroll.Position = UDim2.new(0, 0, 0.06, 0)
+    playersScroll.CanvasSize = UDim2.new(0,0,0,0)
+    playersScroll.BackgroundTransparency = 1
+    playersScroll.ScrollBarThickness = 6
+
+    local copyBtn = Instance.new("TextButton", right)
+    copyBtn.Size = UDim2.new(1, 0, 0, 36)
+    copyBtn.Position = UDim2.new(0, 0, 0.82, 0)
+    copyBtn.Text = "Copy Selected Avatar"
+    copyBtn.Font = Enum.Font.GothamBold
+    copyBtn.TextSize = 14
+    copyBtn.BackgroundColor3 = Color3.fromRGB(60, 50, 160)
+    copyBtn.TextColor3 = Color3.fromRGB(240,240,255)
+
+    local refreshBtn = Instance.new("TextButton", right)
+    refreshBtn.Size = UDim2.new(1, 0, 0, 28)
+    refreshBtn.Position = UDim2.new(0, 0, 0.9, 0)
+    refreshBtn.Text = "Refresh List"
+    refreshBtn.Font = Enum.Font.Gotham
+    refreshBtn.TextSize = 13
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(30,30,50)
+
+    -- Populate players initially
+    populatePlayersScrolling(playersScroll)
+    -- update CanvasSize to fit
+    local function updateCanvas()
+        local layout = playersScroll:FindFirstChildWhichIsA("UIListLayout")
+        if layout then
+            playersScroll.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 8)
         end
     end
-end)
+    wait(0.1)
+    updateCanvas()
 
--- 🔹 GodMode
-CreateToggle("GodMode", function(state)
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChildOfClass("Humanoid") then
-        if state then
-            char:FindFirstChildOfClass("Humanoid").MaxHealth = math.huge
-            char:FindFirstChildOfClass("Humanoid").Health = math.huge
+    refreshBtn.MouseButton1Click:Connect(function()
+        populatePlayersScrolling(playersScroll)
+        task.wait(0.05)
+        updateCanvas()
+        notify("List", "Player list refreshed", 1.5)
+    end)
+
+    copyBtn.MouseButton1Click:Connect(function()
+        local sel = playersScroll.selected
+        if sel and Players:FindFirstChild(sel.Name) then
+            copyAvatarFromPlayer(sel)
         else
-            char:FindFirstChildOfClass("Humanoid").MaxHealth = 100
-            char:FindFirstChildOfClass("Humanoid").Health = 100
+            notify("Avatar Copy", "No player selected", 2)
         end
-    end
+    end)
+
+    -- Teleport button bottom
+    local tpBtn = Instance.new("TextButton", main)
+    tpBtn.Text = "Teleport to Spawn"
+    tpBtn.Size = UDim2.new(0.4, 0, 0, 34)
+    tpBtn.Position = UDim2.new(0.05, 0, 0.92, 0)
+    tpBtn.Font = Enum.Font.GothamBold
+    tpBtn.TextSize = 14
+    tpBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 180)
+    tpBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    tpBtn.MouseButton1Click:Connect(function()
+        local char = localPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local spawn = workspace:FindFirstChildOfClass("SpawnLocation") or workspace:FindFirstChild("Spawn")
+            if spawn and spawn:IsA("BasePart") then
+                char.HumanoidRootPart.CFrame = spawn.CFrame + Vector3.new(0,3,0)
+            else
+                char.HumanoidRootPart.CFrame = CFrame.new(0, 10, 0)
+            end
+            notify("TP", "Teleported to spawn", 1.4)
+        end
+    end)
+
+    -- Draggable (manual)
+    local dragging, dragStart, startPos
+    main.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = main.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    main.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+            local delta = input.Position - dragStart
+            main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    -- Insert key toggles visibility
+    local visible = true
+    UserInputService.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        if input.KeyCode == Enum.KeyCode.Insert then
+            visible = not visible
+            screenGui.Enabled = visible
+        end
+    end)
+
+    return screenGui
+end
+
+-- build UI
+local gui = makeNeonGui()
+
+-- clean up on unload
+local function destroyAll()
+    if gui and gui.Parent then gui:Destroy() end
+    stopFly()
+end
+
+-- call destroyAll on player removal (just in case)
+Players.PlayerRemoving:Connect(function(p)
+    if p == localPlayer then destroyAll() end
 end)
 
--- 🔹 Teleport to Spawn (tek seferlik buton)
-local Teleport = Instance.new("TextButton")
-Teleport.Text = "Teleport to Spawn"
-Teleport.Size = UDim2.new(1, -10, 0, 40)
-Teleport.BackgroundColor3 = Color3.fromRGB(60, 60, 150)
-Teleport.TextColor3 = Color3.fromRGB(255, 255, 255)
-Teleport.Font = Enum.Font.SourceSansBold
-Teleport.TextSize = 18
-Teleport.Parent = Frame
-
-Teleport.MouseButton1Click:Connect(function()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0,10,0))
-    end
-end)
+-- Provide a little API return for loadstring usage
+return {
+    ToggleFly = function() if state.flyEnabled then stopFly() else startFly() end end,
+    StartFly = startFly,
+    StopFly = stopFly,
+    ApplySpeed = function(v) state.speedVal = v; if state.speedEnabled and getHumanoid() then getHumanoid().WalkSpeed = v end end,
+    ApplyJump = function(v) state.jumpVal = v; if state.jumpEnabled and getHumanoid() then getHumanoid().JumpPower = v end end,
+    CopyAvatar = copyAvatarFromPlayer,
+    Destroy = destroyAll,
+}
