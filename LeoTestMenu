@@ -1,12 +1,19 @@
--- IceHub Style Menu (Test Version)
+-- IceHub Style Menu (Toggle + Buttons)
+
 if game:GetService("CoreGui"):FindFirstChild("IceHubMenu") then
     game:GetService("CoreGui").IceHubMenu:Destroy()
 end
 
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local StarterGui = game:GetService("StarterGui")
+
+-- ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "IceHubMenu"
 ScreenGui.Parent = game:GetService("CoreGui")
 
+-- Ana Frame
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.new(0, 400, 0, 250)
 Frame.Position = UDim2.new(0.5, -200, 0.5, -125)
@@ -15,47 +22,112 @@ Frame.Active = true
 Frame.Draggable = true
 Frame.Parent = ScreenGui
 
+-- Title
 local Title = Instance.new("TextLabel")
-Title.Text = "IceHub Test Menu"
+Title.Text = "Leo IceHub Menu"
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 22
+Title.TextSize = 20
 Title.Parent = Frame
 
-local Button1 = Instance.new("TextButton")
-Button1.Text = "Fly Hack (Test)"
-Button1.Size = UDim2.new(0, 150, 0, 40)
-Button1.Position = UDim2.new(0, 20, 0, 60)
-Button1.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-Button1.TextColor3 = Color3.fromRGB(255, 255, 255)
-Button1.Parent = Frame
+-- UIListLayout
+local Layout = Instance.new("UIListLayout")
+Layout.Parent = Frame
+Layout.Padding = UDim.new(0, 5)
+Layout.FillDirection = Enum.FillDirection.Vertical
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
 
-local Button2 = Instance.new("TextButton")
-Button2.Text = "Speed Hack (Test)"
-Button2.Size = UDim2.new(0, 150, 0, 40)
-Button2.Position = UDim2.new(0, 20, 0, 110)
-Button2.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-Button2.TextColor3 = Color3.fromRGB(255, 255, 255)
-Button2.Parent = Frame
+-- Buton Oluşturucu
+local function CreateToggle(name, callback)
+    local Button = Instance.new("TextButton")
+    Button.Text = name .. ": OFF"
+    Button.Size = UDim2.new(1, -10, 0, 40)
+    Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.Font = Enum.Font.SourceSansBold
+    Button.TextSize = 18
+    Button.Parent = Frame
 
-local Close = Instance.new("TextButton")
-Close.Text = "X"
-Close.Size = UDim2.new(0, 40, 0, 40)
-Close.Position = UDim2.new(1, -45, 0, 0)
-Close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-Close.TextColor3 = Color3.fromRGB(255, 255, 255)
-Close.Parent = Frame
+    local toggled = false
+    Button.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        if toggled then
+            Button.Text = name .. ": ON"
+            Button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        else
+            Button.Text = name .. ": OFF"
+            Button.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+        end
+        callback(toggled)
+    end)
+end
 
-Close.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
+-- 🔹 Speed Hack
+CreateToggle("Speed", function(state)
+    if state then
+        LocalPlayer.Character.Humanoid.WalkSpeed = 50
+    else
+        LocalPlayer.Character.Humanoid.WalkSpeed = 16
+    end
 end)
 
-Button1.MouseButton1Click:Connect(function()
-    print("Fly Hack çalıştı (örnek)")
+-- 🔹 Jump Hack
+CreateToggle("Jump", function(state)
+    if state then
+        LocalPlayer.Character.Humanoid.JumpPower = 120
+    else
+        LocalPlayer.Character.Humanoid.JumpPower = 50
+    end
 end)
 
-Button2.MouseButton1Click:Connect(function()
-    print("Speed Hack çalıştı (örnek)")
+-- 🔹 Fly (basit toggle)
+local flyConnection
+CreateToggle("Fly", function(state)
+    local char = LocalPlayer.Character
+    if state and char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            StarterGui:SetCore("SendNotification", {Title="IceHub", Text="Fly ON", Duration=2})
+            flyConnection = game:GetService("RunService").RenderStepped:Connect(function()
+                char:TranslateBy(Vector3.new(0,0.5,0))
+            end)
+        end
+    else
+        if flyConnection then
+            flyConnection:Disconnect()
+            StarterGui:SetCore("SendNotification", {Title="IceHub", Text="Fly OFF", Duration=2})
+        end
+    end
+end)
+
+-- 🔹 GodMode
+CreateToggle("GodMode", function(state)
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        if state then
+            char:FindFirstChildOfClass("Humanoid").MaxHealth = math.huge
+            char:FindFirstChildOfClass("Humanoid").Health = math.huge
+        else
+            char:FindFirstChildOfClass("Humanoid").MaxHealth = 100
+            char:FindFirstChildOfClass("Humanoid").Health = 100
+        end
+    end
+end)
+
+-- 🔹 Teleport to Spawn (tek seferlik buton)
+local Teleport = Instance.new("TextButton")
+Teleport.Text = "Teleport to Spawn"
+Teleport.Size = UDim2.new(1, -10, 0, 40)
+Teleport.BackgroundColor3 = Color3.fromRGB(60, 60, 150)
+Teleport.TextColor3 = Color3.fromRGB(255, 255, 255)
+Teleport.Font = Enum.Font.SourceSansBold
+Teleport.TextSize = 18
+Teleport.Parent = Frame
+
+Teleport.MouseButton1Click:Connect(function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0,10,0))
+    end
 end)
