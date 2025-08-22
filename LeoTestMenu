@@ -1,174 +1,167 @@
--- LeoHubUI - Full Menu System with Toggle Button, Draggable, Resizable, Effects
--- Paste this into your GitHub as LeoHubUI.lua
+--// LeoHubUI Full Version with Effects, Animations, Toggle Button //
+-- Made for loadstring execution
 
+-- Services
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
 -- ScreenGui
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "LeoHubUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game.CoreGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LeoHubUI"
+screenGui.Parent = playerGui
+screenGui.ResetOnSpawn = false
 
--- Toggle Button (always visible, middle left)
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Name = "ToggleButton"
-ToggleButton.Size = UDim2.new(0, 40, 0, 120)
-ToggleButton.Position = UDim2.new(0, 5, 0.5, -60)
-ToggleButton.AnchorPoint = Vector2.new(0,0)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(30,30,30)
-ToggleButton.Text = "≡"
-ToggleButton.TextColor3 = Color3.fromRGB(255,255,255)
-ToggleButton.TextSize = 24
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.Parent = ScreenGui
+-- Toggle Button (Always Visible - Orta Sol)
+local toggleButton = Instance.new("TextButton")
+toggleButton.Name = "ToggleButton"
+toggleButton.Parent = screenGui
+toggleButton.Size = UDim2.new(0, 40, 0, 40)
+toggleButton.Position = UDim2.new(0, 5, 0.5, -20)
+toggleButton.AnchorPoint = Vector2.new(0, 0.5)
+toggleButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+toggleButton.Text = "≡"
+toggleButton.TextSize = 28
+toggleButton.TextColor3 = Color3.new(1,1,1)
 
-local ToggleCorner = Instance.new("UICorner", ToggleButton)
-ToggleCorner.CornerRadius = UDim.new(0,8)
+local tbCorner = Instance.new("UICorner", toggleButton)
+tbCorner.CornerRadius = UDim.new(1,0)
 
-local ToggleStroke = Instance.new("UIStroke", ToggleButton)
-ToggleStroke.Thickness = 2
-ToggleStroke.Color = Color3.fromRGB(0, 255, 170)
-ToggleStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local tbStroke = Instance.new("UIStroke", toggleButton)
+tbStroke.Thickness = 2
+tbStroke.Color = Color3.fromRGB(0,255,170)
 
--- Main Frame
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 400, 0, 300)
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-MainFrame.AnchorPoint = Vector2.new(0.5,0.5)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-MainFrame.Visible = false
-MainFrame.Parent = ScreenGui
+-- Main Frame (Menu)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Parent = screenGui
+mainFrame.Size = UDim2.new(0, 400, 0, 300)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+mainFrame.Visible = false
 
-local MainCorner = Instance.new("UICorner", MainFrame)
-MainCorner.CornerRadius = UDim.new(0,12)
+local frameCorner = Instance.new("UICorner", mainFrame)
+frameCorner.CornerRadius = UDim.new(0,12)
 
-local MainStroke = Instance.new("UIStroke", MainFrame)
-MainStroke.Thickness = 3
-MainStroke.Color = Color3.fromRGB(0, 200, 255)
+local frameStroke = Instance.new("UIStroke", mainFrame)
+frameStroke.Thickness = 3
+frameStroke.Color = Color3.fromRGB(0,255,170)
 
--- Draggable
-local UserInputService = game:GetService("UserInputService")
-local dragging, dragInput, dragStart, startPos
-
-local function update(input)
-    local delta = input.Position - dragStart
-    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-        startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-MainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        update(input)
-    end
-end)
+-- Title
+local title = Instance.new("TextLabel")
+title.Parent = mainFrame
+title.Size = UDim2.new(1,0,0,40)
+title.BackgroundTransparency = 1
+title.Text = "LeoHubUI"
+title.TextColor3 = Color3.fromRGB(0,255,170)
+title.TextSize = 26
+title.Font = Enum.Font.GothamBold
 
 -- Close Button
-local CloseButton = Instance.new("TextButton")
-CloseButton.Name = "CloseButton"
-CloseButton.Size = UDim2.new(0, 30, 0, 30)
-CloseButton.Position = UDim2.new(1, -35, 0, 5)
-CloseButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
-CloseButton.Text = "X"
-CloseButton.TextColor3 = Color3.fromRGB(255,255,255)
-CloseButton.TextSize = 20
-CloseButton.Font = Enum.Font.GothamBold
-CloseButton.Parent = MainFrame
+local closeBtn = Instance.new("TextButton")
+closeBtn.Parent = mainFrame
+closeBtn.Size = UDim2.new(0,40,0,40)
+closeBtn.Position = UDim2.new(1,-45,0,5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1,0,0)
+local cbCorner = Instance.new("UICorner", closeBtn)
 
-local CloseCorner = Instance.new("UICorner", CloseButton)
-CloseCorner.CornerRadius = UDim.new(0,6)
-
--- Layout for buttons
-local UIList = Instance.new("UIListLayout", MainFrame)
-UIList.Padding = UDim.new(0,6)
-UIList.FillDirection = Enum.FillDirection.Vertical
-UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-UIList.VerticalAlignment = Enum.VerticalAlignment.Center
-
--- Example Hack Buttons
-local function createButton(name, callback)
+-- Button Template Function
+local function createButton(name, yPos, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 200, 0, 40)
-    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    btn.Parent = mainFrame
+    btn.Size = UDim2.new(0.9,0,0,40)
+    btn.Position = UDim2.new(0.05,0,0,yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(45,45,45)
     btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
-    btn.TextSize = 18
-    btn.Font = Enum.Font.GothamBold
-    btn.Parent = MainFrame
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = 20
 
-    local corner = Instance.new("UICorner", btn)
-    corner.CornerRadius = UDim.new(0,8)
+    local bCorner = Instance.new("UICorner", btn)
+    local bStroke = Instance.new("UIStroke", btn)
+    bStroke.Color = Color3.fromRGB(0,255,170)
 
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Thickness = 2
-    stroke.Color = Color3.fromRGB(0, 200, 255)
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60,60,60)}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45,45,45)}):Play()
+    end)
 
     btn.MouseButton1Click:Connect(callback)
 end
 
--- Sample functional buttons
+-- Example Hack Buttons
 local flyEnabled = false
-local flyConnection
-createButton("Fly", function()
+createButton("Fly", 60, function()
     flyEnabled = not flyEnabled
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hum = char:FindFirstChildOfClass("Humanoid")
     if flyEnabled then
-        local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local Humanoid = Character:FindFirstChildOfClass("Humanoid")
-        flyConnection = game:GetService("RunService").RenderStepped:Connect(function()
-            Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-            Character:TranslateBy(Vector3.new(0,0.5,0))
-        end)
+        hum.PlatformStand = true
+        local bv = Instance.new("BodyVelocity", char.PrimaryPart)
+        bv.Velocity = Vector3.new(0,50,0)
+        bv.MaxForce = Vector3.new(1e5,1e5,1e5)
     else
-        if flyConnection then flyConnection:Disconnect() end
+        hum.PlatformStand = false
+        if char.PrimaryPart:FindFirstChild("BodyVelocity") then
+            char.PrimaryPart.BodyVelocity:Destroy()
+        end
     end
 end)
 
-createButton("Speed Boost", function()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then hum.WalkSpeed = 50 end
+createButton("Speed Boost", 110, function()
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    if hum then hum.WalkSpeed = 100 end
 end)
 
-createButton("Reset Speed", function()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hum = char:FindFirstChildOfClass("Humanoid")
+createButton("Reset Speed", 160, function()
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
     if hum then hum.WalkSpeed = 16 end
 end)
 
-createButton("Rejoin", function()
-    game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+createButton("Rejoin", 210, function()
+    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
 end)
 
-createButton("Reset Character", function()
-    LocalPlayer.Character:BreakJoints()
+createButton("Reset Character", 260, function()
+    player.Character:BreakJoints()
 end)
 
--- Toggle Logic
-ToggleButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
+-- Toggle button functionality
+toggleButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
 end)
 
-CloseButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
+-- Close button functionality
+closeBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+end)
+
+-- Dragging functionality
+local dragging, dragStart, startPos
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+
+mainFrame.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
 end)
