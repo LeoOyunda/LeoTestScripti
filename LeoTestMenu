@@ -1,110 +1,302 @@
--- IceHub Style Menu (Leo Edition)
+Tabii ki! Aşağıda, her butonun durumunu açıp kapatmanıza olanak tanıyan bir yapı ile güncellenmiş bir GUI menüsü örneği bulabilirsiniz. Bu örnekte, butonların her biri "Aç" veya "Kapat" durumunu gösterecek şekilde düzenlendi:
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
+```lua
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
 
--- UI Library
+-- GUI oluşturma
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
-local UICorner = Instance.new("UICorner")
-local Title = Instance.new("TextLabel")
+local TitleLabel = Instance.new("TextLabel")
+local AllGamepassesButton = Instance.new("TextButton")
+local VIPButton = Instance.new("TextButton")
+local NoClipButton = Instance.new("TextButton")
+local SpeedButton = Instance.new("TextButton")
+local JumpButton = Instance.new("TextButton")
+local FlyButton = Instance.new("TextButton")
+local CloseButton = Instance.new("TextButton")
 
-ScreenGui.Name = "IceHubMenu"
-ScreenGui.Parent = game.CoreGui
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
 
-MainFrame.Size = UDim2.new(0, 250, 0, 300)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -150)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+MainFrame.Size = UDim2.new(0, 300, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -250)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 
-UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = MainFrame
+TitleLabel.Parent = MainFrame
+TitleLabel.Size = UDim2.new(0, 300, 0, 50)
+TitleLabel.Text = "Hile Menüsü"
+TitleLabel.TextColor3 = Color3.new(1, 1, 1)
+TitleLabel.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+TitleLabel.TextScaled = true
 
-Title.Text = "IceHub V1"
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 20
-Title.Parent = MainFrame
-
--- UI Button Factory
-local function createToggleButton(name, yPos, callback)
+-- Butonları oluşturma
+local function createButton(name, position)
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -20, 0, 30)
-    button.Position = UDim2.new(0, 10, 0, yPos)
-    button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    button.Text = name .. " [OFF]"
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.TextSize = 16
     button.Parent = MainFrame
+    button.Size = UDim2.new(0, 260, 0, 50)
+    button.Position = position
+    button.Text = name .. " (Kapalı)"
+    button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextScaled = true
 
-    local state = false
-    button.MouseButton1Click:Connect(function()
-        state = not state
-        button.Text = name .. (state and " [ON]" or " [OFF]")
-        callback(state)
+    -- Animasyonlar
+    button.MouseEnter:Connect(function()
+        button.BackgroundColor3 = Color3.new(0.4, 0.4, 0.4)
     end)
+
+    button.MouseLeave:Connect(function()
+        button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    end)
+    
+    return button
 end
 
--- Features
-createToggleButton("Speed", 50, function(state)
-    if state then
-        LocalPlayer.Character.Humanoid.WalkSpeed = 50
-    else
-        LocalPlayer.Character.Humanoid.WalkSpeed = 16
-    end
+AllGamepassesButton = createButton("Bütün Gamepass'leri Al", UDim2.new(0, 20, 0, 60))
+VIPButton = createButton("VIP Al", UDim2.new(0, 20, 0, 120))
+NoClipButton = createButton("NoClip", UDim2.new(0, 20, 0, 180))
+SpeedButton = createButton("Speed Ayarı", UDim2.new(0, 20, 0, 240))
+JumpButton = createButton("Jump Ayarı", UDim2.new(0, 20, 0, 300))
+FlyButton = createButton("Uç", UDim2.new(0, 20, 0, 360))
+
+CloseButton.Parent = MainFrame
+CloseButton.Size = UDim2.new(0, 40, 0, 40)
+CloseButton.Position = UDim2.new(1, -50, 0, 5)
+CloseButton.Text = "X"
+CloseButton.BackgroundColor3 = Color3.new(1, 0, 0)
+
+-- Kapatma fonksiyonu
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
 end)
 
-createToggleButton("Jump", 90, function(state)
-    if state then
-        LocalPlayer.Character.Humanoid.JumpPower = 150
-    else
-        LocalPlayer.Character.Humanoid.JumpPower = 50
-    end
-end)
-
-createToggleButton("GodMode", 130, function(state)
-    if state and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.MaxHealth = math.huge
-        LocalPlayer.Character.Humanoid.Health = math.huge
-    else
-        LocalPlayer.Character.Humanoid.MaxHealth = 100
-        LocalPlayer.Character.Humanoid.Health = 100
-    end
-end)
-
-createToggleButton("Fly", 170, function(state)
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    if state then
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local bodyVel = Instance.new("BodyVelocity")
-            bodyVel.Velocity = Vector3.new(0,0,0)
-            bodyVel.MaxForce = Vector3.new(4000,4000,4000)
-            bodyVel.Parent = hrp
-            UserInputService.InputBegan:Connect(function(input)
-                if input.KeyCode == Enum.KeyCode.Space then
-                    bodyVel.Velocity = Vector3.new(0,50,0)
-                elseif input.KeyCode == Enum.KeyCode.LeftControl then
-                    bodyVel.Velocity = Vector3.new(0,-50,0)
-                end
-            end)
+local noclipActive = false
+NoClipButton.MouseButton1Click:Connect(function()
+    noclipActive = not noclipActive
+    NoClipButton.Text = "NoClip (Açık)"
+    if noclipActive then
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Part") and v.CanCollide then
+                v.CanCollide = false
+            end
         end
     else
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp and hrp:FindFirstChildOfClass("BodyVelocity") then
-            hrp:FindFirstChildOfClass("BodyVelocity"):Destroy()
+        NoClipButton.Text = "NoClip (Kapalı)"
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Part") then
+                v.CanCollide = true
+            end
         end
     end
 end)
 
-createToggleButton("Teleport Spawn", 210, function(state)
-    if state then
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0, 5, 0))
+local speedActive = false
+SpeedButton.MouseButton1Click:Connect(function()
+    speedActive = not speedActive
+    SpeedButton.Text = speedActive and "Speed Ayarı (Açık)" or "Speed Ayarı (Kapalı)"
+    player.Character.Humanoid.WalkSpeed = speedActive and 50 or 16 -- Varsayılan hız
+end)
+
+local jumpActive = false
+JumpButton.MouseButton1Click:Connect(function()
+    jumpActive = not jumpActive
+    JumpButton.Text = jumpActive and "Jump Ayarı (Açık)" or "Jump Ayarı (Kapalı)"
+    player.Character.Humanoid.JumpPower = jumpActive and 100 or 50 -- Varsayılan zıplama
+end)
+
+local flyActive = false
+FlyButton.MouseButton1Click:Connect(function()
+    flyActive = not flyActive
+    FlyButton.Text = flyActive and "Uç (Açık)" or "Uç (Kapalı)"
+    if flyActive then
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+        bodyVelocity.Parent = player.Character:FindFirstChild("HumanoidRootPart")
+
+        while flyActive do
+            wait()
+            bodyVelocity.Velocity = Vector3.new(mouse.Hit.lookVector.X * 50, 50, mouse.Hit.lookVector.Z * 50)
+        end
+        bodyVelocity:Destroy()
+    end
+end)
+
+-- Uçma ile ilgili kontroller
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Space and flyActive then
+        player.Character.HumanoidRootPart.Velocity = Vector3.new(0, 50, 0)
+    end
+end)
+
+-- "Bütün Gamepass'leri Al" butonuna işlev ekleme (gerçek işlevsellik yok)
+AllGamepassesButton.MouseButton1Click:Connect(function()
+    print("Bütün gamepass'ler alınamadı!") -- Gerçek işlevsellik yok.
+end)
+
+-- "VIP Al" butonuna işlev ekleme (simülasyon)
+VIPButton.MouseButton1Click:Connect(function()
+    print("VIP gamepass alınamadı!") -- Gerçek işlevsellik yok.
+end)
+```
+
+### Özellikler:
+- Her buton, açık veya kapalı olduğunu belirten bir mesaj gösterir.
+- **NoClip**: Açık olduğunda çarpışmayı kapatır, kapalı olduğunda çarpışmayı açar.
+- **Speed ve Jump**: Açık olduğunda hız ve zıplama değerlerini artırır, kapalı olduğunda varsayılan değerlere geri döner.
+- **Fly**: Açık olduğunda uçma işlevselliğini etkinleştirir. Kapalı olduğunda uçma işlevi devre dışı kalır.
+
+### Not:
+Bu script, yukarıda belirtilen işlevleri simüle eder; ancak gerçek gamepass işlevselliğini eklemez. Gerçek gamepass'leri bypass etmek veya hile yapmak, hesabınızın yasaklanmasına neden olabilir. Lütfen bu tür eylemleri yapmaktan kaçının. Başka bir konuda yardımcı olmamı isterseniz, lütfen belirtin!
+
+-- GUI oluşturma
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+local AllGamepassesButton = Instance.new("TextButton")
+local VIPButton = Instance.new("TextButton")
+local NoClipButton = Instance.new("TextButton")
+local SpeedButton = Instance.new("TextButton")
+local JumpButton = Instance.new("TextButton")
+local FlyButton = Instance.new("TextButton")
+local CloseButton = Instance.new("TextButton")
+
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+MainFrame.Size = UDim2.new(0, 300, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -250)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+
+TitleLabel.Parent = MainFrame
+TitleLabel.Size = UDim2.new(0, 300, 0, 50)
+TitleLabel.Text = "Hile Menüsü"
+TitleLabel.TextColor3 = Color3.new(1, 1, 1)
+TitleLabel.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+TitleLabel.TextScaled = true
+
+-- Butonları oluşturma
+local function createButton(name, position)
+    local button = Instance.new("TextButton")
+    button.Parent = MainFrame
+    button.Size = UDim2.new(0, 260, 0, 50)
+    button.Position = position
+    button.Text = name .. " (Kapalı)"
+    button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextScaled = true
+
+    -- Animasyonlar
+    button.MouseEnter:Connect(function()
+        button.BackgroundColor3 = Color3.new(0.4, 0.4, 0.4)
+    end)
+
+    button.MouseLeave:Connect(function()
+        button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    end)
+    
+    return button
+end
+
+AllGamepassesButton = createButton("Bütün Gamepass'leri Al", UDim2.new(0, 20, 0, 60))
+VIPButton = createButton("VIP Al", UDim2.new(0, 20, 0, 120))
+NoClipButton = createButton("NoClip", UDim2.new(0, 20, 0, 180))
+SpeedButton = createButton("Speed Ayarı", UDim2.new(0, 20, 0, 240))
+JumpButton = createButton("Jump Ayarı", UDim2.new(0, 20, 0, 300))
+FlyButton = createButton("Uç", UDim2.new(0, 20, 0, 360))
+
+CloseButton.Parent = MainFrame
+CloseButton.Size = UDim2.new(0, 40, 0, 40)
+CloseButton.Position = UDim2.new(1, -50, 0, 5)
+CloseButton.Text = "X"
+CloseButton.BackgroundColor3 = Color3.new(1, 0, 0)
+
+-- Kapatma fonksiyonu
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+local noclipActive = false
+NoClipButton.MouseButton1Click:Connect(function()
+    noclipActive = not noclipActive
+    NoClipButton.Text = "NoClip (Açık)"
+    if noclipActive then
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Part") and v.CanCollide then
+                v.CanCollide = false
+            end
+        end
+    else
+        NoClipButton.Text = "NoClip (Kapalı)"
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Part") then
+                v.CanCollide = true
+            end
+        end
+    end
+end)
+
+local speedActive = false
+SpeedButton.MouseButton1Click:Connect(function()
+    speedActive = not speedActive
+    SpeedButton.Text = speedActive and "Speed Ayarı (Açık)" or "Speed Ayarı (Kapalı)"
+    player.Character.Humanoid.WalkSpeed = speedActive and 50 or 16 -- Varsayılan hız
+end)
+
+local jumpActive = false
+JumpButton.MouseButton1Click:Connect(function()
+    jumpActive = not jumpActive
+    JumpButton.Text = jumpActive and "Jump Ayarı (Açık)" or "Jump Ayarı (Kapalı)"
+    player.Character.Humanoid.JumpPower = jumpActive and 100 or 50 -- Varsayılan zıplama
+end)
+
+local flyActive = false
+FlyButton.MouseButton1Click:Connect(function()
+    flyActive = not flyActive
+    FlyButton.Text = flyActive and "Uç (Açık)" or "Uç (Kapalı)"
+    if flyActive then
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+        bodyVelocity.Parent = player.Character:FindFirstChild("HumanoidRootPart")
+
+        while flyActive do
+            wait()
+            bodyVelocity.Velocity = Vector3.new(mouse.Hit.lookVector.X * 50, 50, mouse.Hit.lookVector.Z * 50)
+        end
+        bodyVelocity:Destroy()
+    end
+end)
+
+-- Uçma ile ilgili kontroller
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Space and flyActive then
+        player.Character.HumanoidRootPart.Velocity = Vector3.new(0, 50, 0)
+    end
+end)
+
+-- "Bütün Gamepass'leri Al" butonuna işlev ekleme (gerçek işlevsellik yok)
+AllGamepassesButton.MouseButton1Click:Connect(function()
+    print("Bütün gamepass'ler alınamadı!") -- Gerçek işlevsellik yok.
+end)
+
+-- "VIP Al" butonuna işlev ekleme (simülasyon)
+VIPButton.MouseButton1Click:Connect(function()
+    print("VIP gamepass alınamadı!") -- Gerçek işlevsellik yok.
+end)
+```
+
+### Özellikler:
+- Her buton, açık veya kapalı olduğunu belirten bir mesaj gösterir.
+- **NoClip**: Açık olduğunda çarpışmayı kapatır, kapalı olduğunda çarpışmayı açar.
+- **Speed ve Jump**: Açık olduğunda hız ve zıplama değerlerini artırır, kapalı olduğunda varsayılan değerlere geri döner.
+- **Fly**: Açık olduğunda uçma işlevselliğini etkinleştirir. Kapalı olduğunda uçma işlevi devre dışı kalır.
+
+### Not:
+Bu script, yukarıda belirtilen işlevleri simüle eder; ancak gerçek gamepass işlevselliğini eklemez. Gerçek gamepass'leri bypass etmek veya hile yapmak, hesabınızın yasaklanmasına neden olabilir. Lütfen bu tür eylemleri yapmaktan kaçının. Başka bir konuda yardımcı olmamı isterseniz, lütfen belirtin!er.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0, 5, 0))
         end
     end
 end)
