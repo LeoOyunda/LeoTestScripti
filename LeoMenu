@@ -1,0 +1,140 @@
+-- // LeoOyunda - Tam Menü Scripti // --
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+ScreenGui.Name = "LeoMainGui"
+ScreenGui.ResetOnSpawn = false
+
+-- Sürüklenebilir Buton
+local DragButton = Instance.new("TextButton")
+DragButton.Size = UDim2.new(0, 80, 0, 80)
+DragButton.Position = UDim2.new(0.05, 0, 0.4, 0)
+DragButton.Text = "⚙️"
+DragButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+DragButton.TextScaled = true
+DragButton.TextColor3 = Color3.new(1,1,1)
+DragButton.Parent = ScreenGui
+DragButton.Active = true
+DragButton.Draggable = true
+
+-- Menü Ana Frame
+local Menu = Instance.new("Frame")
+Menu.Size = UDim2.new(0, 300, 0, 400)
+Menu.Position = UDim2.new(0.5, -150, 0.5, -200)
+Menu.AnchorPoint = Vector2.new(0.5, 0.5)
+Menu.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Menu.Visible = false
+Menu.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel", Menu)
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Text = "Leo Menü"
+Title.TextScaled = true
+Title.TextColor3 = Color3.new(1,1,1)
+Title.BackgroundColor3 = Color3.fromRGB(60,60,60)
+
+-- Buton oluşturma fonksiyonu
+local function createButton(name, order)
+	local btn = Instance.new("TextButton")
+	btn.Parent = Menu
+	btn.Size = UDim2.new(0.8, 0, 0, 40)
+	btn.Position = UDim2.new(0.1, 0, 0, 60 + (order - 1) * 50)
+	btn.Text = name .. " (Kapalı)"
+	btn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.TextScaled = true
+	btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(90,90,90) end)
+	btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(70,70,70) end)
+	return btn
+end
+
+-- Butonlar
+local NoClipBtn = createButton("NoClip", 1)
+local SpeedBtn = createButton("Speed", 2)
+local JumpBtn = createButton("Jump", 3)
+local FlyBtn = createButton("Fly", 4)
+
+-- Menü Aç/Kapat
+DragButton.MouseButton1Click:Connect(function()
+	Menu.Visible = not Menu.Visible
+end)
+
+-- NoClip
+local noclip = false
+RunService.Stepped:Connect(function()
+	if noclip then
+		for _, part in pairs(player.Character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end
+end)
+NoClipBtn.MouseButton1Click:Connect(function()
+	noclip = not noclip
+	NoClipBtn.Text = noclip and "NoClip (Açık)" or "NoClip (Kapalı)"
+end)
+
+-- Speed
+local speedActive = false
+SpeedBtn.MouseButton1Click:Connect(function()
+	speedActive = not speedActive
+	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if hum then hum.WalkSpeed = speedActive and 50 or 16 end
+	SpeedBtn.Text = speedActive and "Speed (Açık)" or "Speed (Kapalı)"
+end)
+
+-- Jump
+local jumpActive = false
+JumpBtn.MouseButton1Click:Connect(function()
+	jumpActive = not jumpActive
+	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if hum then hum.JumpPower = jumpActive and 100 or 50 end
+	JumpBtn.Text = jumpActive and "Jump (Açık)" or "Jump (Kapalı)"
+end)
+
+-- Fly
+local flyActive = false
+local flyConn, bv
+FlyBtn.MouseButton1Click:Connect(function()
+	flyActive = not flyActive
+	FlyBtn.Text = flyActive and "Fly (Açık)" or "Fly (Kapalı)"
+
+	if flyActive then
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		if not hrp then return end
+		bv = Instance.new("BodyVelocity", hrp)
+		bv.MaxForce = Vector3.new(1e5,1e5,1e5)
+
+		flyConn = RunService.Heartbeat:Connect(function()
+			if not flyActive then return end
+			local vel = Vector3.zero
+			if UserInputService:IsKeyDown(Enum.KeyCode.W) then vel = vel + workspace.CurrentCamera.CFrame.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.S) then vel = vel - workspace.CurrentCamera.CFrame.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.A) then vel = vel - workspace.CurrentCamera.CFrame.RightVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.D) then vel = vel + workspace.CurrentCamera.CFrame.RightVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vel = vel + Vector3.new(0,1,0) end
+			if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vel = vel + Vector3.new(0,-1,0) end
+			bv.Velocity = vel * 50
+		end)
+	else
+		if flyConn then flyConn:Disconnect() end
+		if bv then bv:Destroy() end
+	end
+end)
+
+-- Karakter yeniden doğarsa eski ayarları koru
+player.CharacterAdded:Connect(function()
+	task.wait(0.5)
+	local hum = player.Character:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.WalkSpeed = speedActive and 50 or 16
+		hum.JumpPower = jumpActive and 100 or 50
+	end
+end)
